@@ -30,6 +30,7 @@ using HANDLE = System.IntPtr;
 #endregion	
 
 /// <summary>
+/// 1.2.1.95  - Добавлена функция сброса.
 /// 1.2.0.93  - Первая попытка переделать драйвер под Марафон.
 /// 1.1.0.89  - Перенесены классы и дефайны из проектов.
 /// 1.0.15.71 - Найден косяк в Recv.
@@ -65,6 +66,7 @@ using HANDLE = System.IntPtr;
         void Clear_RX();
         int GetStatus();
         int VectorSize();
+        void HWReset();
     }
     public class MyEventArgs : EventArgs
     {
@@ -459,6 +461,10 @@ using HANDLE = System.IntPtr;
         public void Clear_RX()
         {
             Trace.WriteLine("Cleared: ");// + CAN200_ClearBuf(hCan, port).ToString());
+        }
+        public void HWReset()
+        {
+            Trace.WriteLine("Hardware reset");
         }
 
         ~ACANConverter()
@@ -2486,6 +2492,11 @@ using HANDLE = System.IntPtr;
         {
             Trace.WriteLine("Cleared: " + CAN200_ClearBuf(hCan, port).ToString());
         }
+        public void HWReset()
+        {
+            CAN200_HardReset(hCan, 0);
+//            Trace.WriteLine("Hardware reset");
+        }
 
     }
     #endregion
@@ -3116,6 +3127,10 @@ using HANDLE = System.IntPtr;
                 return false;
             }
         }
+        public void HWReset()
+        {
+            CiHwReset(0);
+        }
     }    
     #endregion
     #region M2CANConverter
@@ -3131,72 +3146,53 @@ using HANDLE = System.IntPtr;
         List<canmsg_t> mbuf = new List<canmsg_t>();
         Thread thr;
         Mutex mtx = new Mutex();
-
+        /*
+        EXPORT Int16 __stdcall MarCAN_Open(UInt16 speed);
+        EXPORT Int16 __stdcall MarCAN_Close(void);
+        EXPORT Int16 __stdcall MarCAN_SetCANSpeed(UInt16 speed);
+        EXPORT Int16 __stdcall MarCAN_ClearRX(void);
+        EXPORT Int16 __stdcall MarCAN_GetStatus(chipstat_t *Status);
+        EXPORT Int16 __stdcall MarCAN_Write(pRX_TX_Buffer Buffer);
+        EXPORT Int16 __stdcall MarCAN_GetErrorCounter(canerrs_t *Counter);
+        EXPORT Int16 __stdcall MarCAN_HardReset(HANDLE Handle, int Channel);
+        EXPORT UINT64 __stdcall MarCAN_GetAPIVer(void);
+        EXPORT BYTE __stdcall MarCAN_GetByte(int num);
+        EXPORT void __stdcall MarCAN_Recv_Enable(void);
+        EXPORT void __stdcall MarCAN_Recv_Disable(void);
+        EXPORT Int16 __stdcall MarCAN_Pop(pRX_TX_Buffer Buffer);
+        EXPORT Int16 __stdcall MarCAN_VecSize(void);
+        */
         #region Импорт функций из ДЛЛ
-        [DllImport("chai.dll", CallingConvention = CallingConvention.StdCall)]
-        static extern Int16 CiInit();
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiOpen(Byte chan, Byte flags);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiClose(Byte chan);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiStart(Byte chan);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiStop(Byte chan);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiSetFilter(Byte chan, UInt32 acode, UInt32 amask);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiSetBaud(Byte chan, Byte bt0, Byte bt1);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiWrite(Byte chan, ref canmsg_t mbuf, Int16 cnt);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiTransmit(Byte chan, ref canmsg_t mbuf);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiTrCancel(Byte chan, ref UInt16 trqcnt);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiTrStat(Byte chan, ref UInt16 trqcnt);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiRead(Byte chan, ref canmsg_t mbuf, Int16 cnt);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiErrsGetClear(Byte chan, ref canerrs_t errs);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiWaitEvent(ref canwait_t cw, int cwcount, int tout);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiTrQueThreshold(Byte chan, Int16 getset, ref UInt16 thres);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiRcQueResize(Byte chan, UInt16 size);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiRcQueCancel(Byte chan, ref UInt16 rcqcnt);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiRcQueGetCnt(Byte chan, UInt16 rcqcnt);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiBoardGetSerial(Byte brdnum, ref char sbuf, UInt16 bufsize);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiHwReset(Byte chan);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiSetLom(Byte chan, Byte mode);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiWriteTout(Byte chan, Int16 getset, ref UInt16 msec);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern UInt32 CiGetLibVer();
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern UInt32 CiGetDrvVer();
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiChipStat(Byte chan, ref chipstat_t stat);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiChipStatToStr(ref chipstat_t status, ref chstat_desc_t desc);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiBoardInfo(ref canboard_t binfo);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern void CiStrError(Int16 cierrno, ref char buf, Int16 n);
-        //		static extern void CiStrError(Int16 cierrno, char* buf, Int16 n);
-        //		static extern void CiPerror(Int16 cierrno, const char *s);
-        //		static extern Int16 CiSetCB(Byte chan, Byte ev, void (*ci_handler) (Int16));
-        //		static extern Int16 CiSetCBex(Byte chan, Byte ev, void (*ci_cb_ex) (Byte, Int16, void *), void*udata);
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiCB_lock();
-        [DllImport("chai.dll", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
-        static extern Int16 CiCB_unlock();
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_Open(UInt16 speed);
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_Close();
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_SetCANSpeed(UInt16 speed);
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_ClearRX();
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_GetStatus(ref chipstat_t Status);
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_Write(ref canmsg_t Buffer);
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_GetErrorCounter(ref canerrs_t Counter);
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_HardReset();
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern UInt64 MarCAN_GetAPIVer();
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Byte MarCAN_GetByte(int num);
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern void MarCAN_Recv_Enable();
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern void MarCAN_Recv_Disable();
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_Pop(ref canmsg_t Buffer);
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_VecSize();
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_BoardInfo(ref canboard_t binfo);
         #endregion
         public M2CANConverter()
         {
@@ -3246,7 +3242,14 @@ using HANDLE = System.IntPtr;
         {
             get
             {
-                return "";
+                UInt64 ver = MarCAN_GetAPIVer(); //#define VER 0x0000290120161346
+                int a1 = (int)(ver >> 40);
+                int a2 = (int)(ver >> 32) & 0xFF;
+                int a3 = (int)(ver >> 16) & 0xFFFF;
+                int a4 = (int)(ver >> 8) & 0xFF;
+                int a5 = (int)(ver & 0xFF);
+
+                return a1.ToString("X02") + "." + a2.ToString("X02") + "." + a3.ToString("X04") + " " + a4.ToString("X02") + ":" + a5.ToString("X02");
             }
             set { }
         }
@@ -3254,10 +3257,10 @@ using HANDLE = System.IntPtr;
         {
             try
             {
-                if (CiGetDrvVer() == 0)
+                if (MarCAN_Open(Speed) < 0)
                 {
                     if (ErrEvent != null)
-                        ErrEvent(this, new MyEventArgs("Не установлен драйвер"));
+                        ErrEvent(this, new MyEventArgs("Не могу открыть CAN"));
                     Is_Open = false;
                     return false;
                 }
@@ -3265,30 +3268,14 @@ using HANDLE = System.IntPtr;
             catch (Exception)
             {
                 if (ErrEvent != null)
-                    ErrEvent(this, new MyEventArgs("Не установлен драйвер"));
+                    ErrEvent(this, new MyEventArgs("Не могу открыть CAN"));
                 Is_Open = false;
-                return false;
-            }
-
-            try
-            {
-                if (CiInit() < 0)
-                {
-                    if (ErrEvent != null)
-                        ErrEvent(this, new MyEventArgs("Ошибка библиотеки"));
-                    return false;
-                }
-            }
-            catch (Exception)
-            {
-                if (ErrEvent != null)
-                    ErrEvent(this, new MyEventArgs("Ошибка библиотеки"));
                 return false;
             }
 
             canboard_t binfo = new canboard_t();
             binfo.brdnum = 0;
-            if (CiBoardInfo(ref binfo) < 0)
+            if (MarCAN_BoardInfo(ref binfo) < 0)
             {
                 if (ErrEvent != null)
                     ErrEvent(this, new MyEventArgs("Не подключен адаптер"));
@@ -3297,82 +3284,12 @@ using HANDLE = System.IntPtr;
 
             Info = new String(binfo.name, 3, 13) + " (" + new String(binfo.manufact, 3, 20) + ")";
 
-            /*  open channel */
-            if (CiOpen(Port, Const.CIO_CAN11 | Const.CIO_CAN29) < 0)
-            {
-                if (ErrEvent != null)
-                    ErrEvent(this, new MyEventArgs("Не могу открыть CAN"));
-                return false;
-            }
-
-            /* set baud rate to 500Kbit */
-            Byte bt0, bt1;
-            switch (Speed)
-            {
-                case 0:
-                    bt0 = 0x00;
-                    bt1 = 0x14;
-                    break;
-                case 1:
-                    bt0 = 0x00;
-                    bt1 = 0x16;
-                    break;
-                case 2:
-                    bt0 = 0x00;
-                    bt1 = 0x1c;
-                    break;
-                case 3:
-                    bt0 = 0x01;
-                    bt1 = 0x1c;
-                    break;
-                case 4:
-                    bt0 = 0x03;
-                    bt1 = 0x1c;
-                    break;
-                case 5:
-                    bt0 = 0x04;
-                    bt1 = 0x1c;
-                    break;
-                case 6:
-                    bt0 = 0x09;
-                    bt1 = 0x1c;
-                    break;
-                case 7:
-                    bt0 = 0x18;
-                    bt1 = 0x1c;
-                    break;
-                case 8:
-                    bt0 = 0x31;
-                    bt1 = 0x1c;
-                    break;
-                default:
-                    bt0 = 0x00;
-                    bt1 = 0x1c;
-                    break;
-            }
-            if (CiSetBaud(Port, bt0, bt1) < 0)
-            {
-                if (ErrEvent != null)
-                    ErrEvent(this, new MyEventArgs("Не могу установить скорость"));
-                return false;
-            }
-
-            if (CiRcQueResize(Port, UInt16.MaxValue) < 0)
-            {
-                if (ErrEvent != null)
-                    ErrEvent(this, new MyEventArgs("Не могу изменить буфер"));
-                return false;
-            }
-
-            CiStart(Port);
-            CiHwReset(Port);
             cw.chan = Port;
             cw.wflags = Const.CI_WAIT_RC | Const.CI_WAIT_ER;
             frame.data = new Byte[8];
             canerrs_t errs = new canerrs_t();
-            CiErrsGetClear(Port, ref errs);
+            MarCAN_GetErrorCounter(ref errs);
             Is_Open = true;
-            //            Recv_Enable();
             return true;
         }
         public void Close()
@@ -3381,17 +3298,15 @@ using HANDLE = System.IntPtr;
                 if (thr.IsAlive)
                     thr.Abort();
             thr = null;
-            CiStop(Port);
-            CiClose(Port);
+            MarCAN_Close();
             Is_Open = false;
         }
         public Boolean Send(ref canmsg_t msg)
         {
-            CiStart(0);
             canerrs_t ce = new canerrs_t();
-            CiErrsGetClear(Port, ref ce);
+            MarCAN_GetErrorCounter(ref ce);
 
-            if (CiWrite(Port, ref msg, 1) < 1)
+            if (MarCAN_Write(ref msg) < 0)
             {
                 if (ErrEvent != null)
                     ErrEvent(this, new MyEventArgs("Не удалось отправить сообщение"));
@@ -3400,19 +3315,18 @@ using HANDLE = System.IntPtr;
             else
             {
 #if DDDM
-                Trace.Write("Send data: ");
+                Trace.Write("M2 Send data: ");
                 print_RX_TX(msg);
 #endif
-
                 return true;
             }
         }
         public Boolean Send(ref canmsg_t msg, int timeout)
         {
-            CiStart(0);
             canerrs_t ce = new canerrs_t();
-            CiErrsGetClear(Port, ref ce);
-            if (CiWrite(Port, ref msg, 1) < 1)
+            MarCAN_GetErrorCounter(ref ce);
+
+            if (MarCAN_Write(ref msg) < 0)
             {
                 if (ErrEvent != null)
                     ErrEvent(this, new MyEventArgs("Не удалось отправить сообщение"));
@@ -3421,7 +3335,7 @@ using HANDLE = System.IntPtr;
             else
             {
 #if DDDM
-                Trace.Write("Send data: ");
+                Trace.Write("M2 Send data: ");
                 print_RX_TX(msg);
 #endif
                 return true;
@@ -3439,7 +3353,7 @@ using HANDLE = System.IntPtr;
                 return false;
             pop(ref msg);
 #if DDDM
-            Trace.Write("Recv data: ");
+            Trace.Write("M2 Recv data: ");
             print_RX_TX(msg);
             Trace.WriteLine("");
 #endif
@@ -3456,7 +3370,7 @@ using HANDLE = System.IntPtr;
                 Thread.Sleep(1);
             } while (cnt < count && timeout-- > 0);
 #if DDDM
-            Trace.WriteLine("MCAN packets: " + cnt.ToString());
+            Trace.WriteLine("M2CAN packets: " + cnt.ToString());
 #endif
             if (timeout <= 0)
             {
@@ -3498,18 +3412,14 @@ using HANDLE = System.IntPtr;
         }
         public void Recv_Enable()
         {
-            Trace.WriteLine("Marathon Recv enable");
+            Trace.WriteLine("Marathon2 Recv enable");
             if (vecsize() > 0)
             {
                 mtx.WaitOne();
                 mbuf.Clear();
                 mtx.ReleaseMutex();
             }
-            flag_thr = true;
-            thr = new Thread(t_recv);
-            //thr.Priority = ThreadPriority.Highest;
-            thr.Start();
-            //thr.Priority = ThreadPriority.Highest;
+            MarCAN_Recv_Enable();
         }
         public void Recv_Disable()
         {
@@ -3520,14 +3430,7 @@ using HANDLE = System.IntPtr;
                 mbuf.Clear();
                 mtx.ReleaseMutex();
             }
-            flag_thr = false;
-            if (thr != null)
-                if (thr.IsAlive)
-                {
-                    thr.Join();
-                    thr.Abort();
-                }
-            thr = null;
+            MarCAN_Recv_Disable();
         }
         ~M2CANConverter()
         {
@@ -3542,172 +3445,11 @@ using HANDLE = System.IntPtr;
                 Trace.Write(" 0x" + mm.data[i].ToString("X2"));
             Trace.WriteLine("");
         }
-        public void t_recv()
-        {
-            canmsg_t mess = new canmsg_t();
-            mess.data = new Byte[8];
-            canwait_t cw = new canwait_t();
-            canerrs_t ce = new canerrs_t();
-            cw.chan = Port;
-            cw.wflags = Const.CI_WAIT_RC | Const.CI_WAIT_ER;
-            Int16 ret = 0;
-            CiStart(0);
-            CiErrsGetClear(Port, ref ce);
-            while (flag_thr)
-            {
-                try
-                {
-                    CiErrsGetClear(Port, ref ce);
-                    ret = CiWaitEvent(ref cw, 1, 1000);
-                }
-                catch (Exception)
-                {
-                    if (ErrEvent != null)
-                        ErrEvent(this, new MyEventArgs("Не удалось принять сообщение. Err " + ret.ToString()));
-                    Trace.WriteLine("CiWaitEvent() failed, errcode = " + ret.ToString());
-                }
-                if (ret == 0)
-                {
-                    Trace.WriteLine("thread timeout");
-                    continue;
-                }
-                else if (ret > 0)
-                {
-                    if ((cw.rflags & Const.CI_WAIT_RC) > 0)
-                    {
-                        //                        do
-                        //                        {
-                        ret = CiRead(Port, ref mess, 1);
-                        if (ret >= 1)
-                        {
-                            //Trace.Write("MCAN Recv packets: " + ret.ToString());
-                            //print_RX_TX(msg);
-                            push_back(mess);
-                            //continue;
-                        }
-                        //                        } while (ret > 0);
-                    }
-                    if ((cw.rflags & Const.CI_WAIT_ER) > 0)
-                    {
-                        canerrs_t errs = new canerrs_t();
-                        ret = CiErrsGetClear(Port, ref errs);
-                        if (ret >= 0)
-                        {
-                            if (errs.ewl > 0)
-                                Trace.WriteLine("EWL times = " + errs.ewl.ToString());
-                            if (errs.boff > 0)
-                                Trace.WriteLine("BOFF times " + errs.boff.ToString());
-                            if (errs.hwovr > 0)
-                                Trace.WriteLine("HOVR times " + errs.hwovr.ToString());
-                            if (errs.swovr > 0)
-                                Trace.WriteLine("SOVR times " + errs.swovr.ToString());
-                            if (errs.wtout > 0)
-                                Trace.WriteLine("WTOUT times " + errs.wtout.ToString());
-                        }
-                    }
-                    continue;
-                }
-                else
-                {
-                    Trace.WriteLine("thread timeout");
-                    //                    if (ErrEvent != null)
-                    //                        ErrEvent(this, new MyEventArgs("Не удалось принять сообщение"));
-                    //                    continue;
-                }
-            }
-        }
         public void Clear_RX()
         {
-            canmsg_t mess = new canmsg_t();
-            mess.data = new Byte[8];
-            Int16 ret = 0;
-            do
-            {
-                ret = CiRead(Port, ref mess, 1);
-            } while (ret > 0);
+            MarCAN_ClearRX();
             if (mbuf.Count > 0)
                 mbuf.Clear();
-        }
-        Boolean rx(ref canmsg_t msg, int timeout)
-        {
-            canwait_t cw = new canwait_t();
-            canerrs_t ce = new canerrs_t();
-            canmsg_t[] mmm = new canmsg_t[20000];
-            cw.chan = Port;
-            cw.wflags = Const.CI_WAIT_RC | Const.CI_WAIT_ER;
-            Int16 ret = 0;
-            CiStart(0);
-            CiErrsGetClear(Port, ref ce);
-            try
-            {
-                ret = CiWaitEvent(ref cw, 1, timeout);
-            }
-            catch (Exception)
-            {
-                if (ErrEvent != null)
-                    ErrEvent(this, new MyEventArgs("Не удалось принять сообщение. Err " + ret.ToString()));
-                Trace.WriteLine("CiWaitEvent() failed, errcode = " + ret.ToString());
-            }
-            if (ret < 0)
-            {
-                if (ErrEvent != null)
-                    ErrEvent(this, new MyEventArgs("Не удалось принять сообщение. Err " + ret.ToString()));
-                Trace.WriteLine("CiWaitEvent() failed, errcode = " + ret.ToString());
-                return false;
-            }
-            else if (ret > 0)
-            {
-                if ((cw.rflags & Const.CI_WAIT_RC) > 0)
-                {
-                    ret = CiRead(Port, ref msg, 1);
-                    if (ret >= 1)
-                    {
-                        //Trace.Write("MCAN Recv packets: " + ret.ToString());
-                        //print_RX_TX(msg);
-                        return true;
-                    }
-                    else
-                    {
-                        Trace.WriteLine("error recieving frame from CAN, errcode = " + ret.ToString());
-                        if (ErrEvent != null)
-                            ErrEvent(this, new MyEventArgs("Не удалось принять сообщение"));
-                        return false;
-                    }
-                }
-                if ((cw.rflags & Const.CI_WAIT_ER) > 0)
-                {
-                    canerrs_t errs = new canerrs_t();
-                    ret = CiErrsGetClear(Port, ref errs);
-                    if (ret >= 0)
-                    {
-                        if (errs.ewl > 0)
-                            Trace.WriteLine("EWL times = " + errs.ewl.ToString());
-                        if (errs.boff > 0)
-                            Trace.WriteLine("BOFF %d times " + errs.boff.ToString());
-                        if (errs.hwovr > 0)
-                            Trace.WriteLine("HOVR %d times " + errs.hwovr.ToString());
-                        if (errs.swovr > 0)
-                            Trace.WriteLine("SOVR %d times " + errs.swovr.ToString());
-                        if (errs.wtout > 0)
-                            Trace.WriteLine("WTOUT %d times " + errs.wtout.ToString());
-                    }
-                    else
-                    {
-                        Trace.WriteLine("CiErrsGetClear() failed");
-                        if (ErrEvent != null)
-                            ErrEvent(this, new MyEventArgs("Не удалось принять сообщение"));
-                        return false;
-                    }
-                }
-                return true;
-            }
-            else
-            {
-                Trace.WriteLine("CiWaitEvent timeout");
-                if (ErrEvent != null)
-                    ErrEvent(this, new MyEventArgs("Не удалось принять сообщение"));
-                return false;
-            }
         }
         public int VectorSize()
         {
@@ -3744,6 +3486,10 @@ using HANDLE = System.IntPtr;
                 mtx.ReleaseMutex();
                 return false;
             }
+        }
+        public void HWReset()
+        {
+            MarCAN_HardReset();
         }
     }
     #endregion
