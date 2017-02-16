@@ -3586,42 +3586,12 @@ using HANDLE = System.IntPtr;
         public Boolean Send(ref canmsg_t msg)
         {
             canerrs_t ce = new canerrs_t();
-            MarCAN_GetErrorCounter(ref ce);
-
-            if (MarCAN_Write(ref msg) < 0)
-            {
-                if (ErrEvent != null)
-                    ErrEvent(this, new MyEventArgs("Не удалось отправить сообщение"));
-                return false;
-            }
-            else
-            {
-#if DDDM
-                Trace.Write("M2 Send data: ");
-                print_RX_TX(msg);
-#endif
-                return true;
-            }
+            return true;
         }
         public Boolean Send(ref canmsg_t msg, int timeout)
         {
             canerrs_t ce = new canerrs_t();
-            MarCAN_GetErrorCounter(ref ce);
-
-            if (MarCAN_Write(ref msg) < 0)
-            {
-                if (ErrEvent != null)
-                    ErrEvent(this, new MyEventArgs("Не удалось отправить сообщение"));
-                return false;
-            }
-            else
-            {
-#if DDDM
-                Trace.Write("M2 Send data: ");
-                print_RX_TX(msg);
-#endif
-                return true;
-            }
+            return true;
         }
         public Boolean Recv(ref canmsg_t msg, int timeout)
         {
@@ -3701,7 +3671,7 @@ using HANDLE = System.IntPtr;
                 mbuf.Clear();
                 mtx.ReleaseMutex();
             }
-            MarCAN_Recv_Enable();
+//            MarCAN_Recv_Enable();
         }
         public void Recv_Disable()
         {
@@ -3712,7 +3682,7 @@ using HANDLE = System.IntPtr;
                 mbuf.Clear();
                 mtx.ReleaseMutex();
             }
-            MarCAN_Recv_Disable();
+//            MarCAN_Recv_Disable();
         }
         ~FCANConverter()
         {
@@ -3729,7 +3699,7 @@ using HANDLE = System.IntPtr;
         }
         public void Clear_RX()
         {
-            MarCAN_ClearRX();
+//            MarCAN_ClearRX();
             if (mbuf.Count > 0)
                 mbuf.Clear();
         }
@@ -3771,7 +3741,7 @@ using HANDLE = System.IntPtr;
         }
         public void HWReset()
         {
-            MarCAN_HardReset();
+//            MarCAN_HardReset();
         }
     }
     #endregion
