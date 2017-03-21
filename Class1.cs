@@ -3800,8 +3800,10 @@ using HANDLE = System.IntPtr;
     #region Const
     public class Const
     {
-        public const Byte OLO_Left = 0x11;
-        public const Byte OLO_Right = 0x12;
+//        public const Byte OLO_Left = 0x11;
+//        public const Byte OLO_Right = 0x12;
+        public const Byte OLO_Left = 0x12;
+        public const Byte OLO_Right = 0x11;
         public const Byte OLO_All = 0x00;
 
         public const byte CIO_BLOCK = 0x1;         // ignored (block mode was removed in CHAI 2.x
