@@ -4410,6 +4410,7 @@ using HANDLE = System.IntPtr;
         public const Byte mID_SIMRESET = 0x08;
         public const Byte mID_GETTIME = 0x09;
         public const Byte mID_REQTIME = 0x0A;
+        public const Byte mID_REQVER = 0x20;
 
         public Byte messageID;
         public Byte deviceID;
