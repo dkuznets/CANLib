@@ -4414,6 +4414,7 @@ using HANDLE = System.IntPtr;
         public const Byte mID_GETTIME = 0x09;
         public const Byte mID_REQTIME = 0x0A;
         public const Byte mID_REQVER = 0x0B;
+        public const Byte mID_GETVER = 0x0C;
 
         public Byte messageID;
         public Byte deviceID;
