@@ -4007,6 +4007,11 @@ using HANDLE = System.IntPtr;
         public const _u16 CAN_MSG_ID_MC2PC = 0x031;
 
         public const _u16 FLAG_ERASE_USER_CODE = 0x01;
+
+        public const byte COMMAND_MODULE_OPERATIONAL    = 0x00;
+        public const byte COMMAND_MODULE_SELFTEST       = 0x01;
+        public const byte COMMAND_MODULE_EMBEDCONTROL   = 0x02;
+        public const byte COMMAND_MODULE_PROGRAMMING    = 0x03;
     }
 
     #endregion
