@@ -30,6 +30,8 @@ using HANDLE = System.IntPtr;
 #endregion	
 
 /// <summary>
+/// 1.3.0.103  - Добавлено определение mID_IN_SN = 0x10;
+///            - Добавлено определение mID_OUT_SN = 0x11;
 /// 1.3.0.100  - Добавлено определение mID_REQVER = 0x20;
 /// 1.3.0.99  - Добавлен fake-драйвер CAN для локальной отладки.
 /// 1.2.1.96  - Добавлено определение для бродкаста .
@@ -4422,6 +4424,8 @@ using HANDLE = System.IntPtr;
         public const Byte mID_GETVER = 0x0C;
         public const Byte mID_INLOADER = 0x0D;
         public const Byte mID_OUTLOADER = 0x0E;
+        public const Byte mID_IN_SN = 0x10;
+        public const Byte mID_OUT_SN = 0x11;
 
         public Byte messageID;
         public Byte deviceID;
