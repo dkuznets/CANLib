@@ -30,6 +30,7 @@ using HANDLE = System.IntPtr;
 #endregion	
 
 /// <summary>
+/// 1.3.0.105  - Добавлено SetBool и GetBool в INI;
 /// 1.3.0.103  - Добавлено определение mID_GET_SN = 0x10;
 ///            - Добавлено определение mID_SET_SN = 0x11;
 ///            - Добавлено определение mID_SN = 0x12;
@@ -3785,6 +3786,12 @@ using HANDLE = System.IntPtr;
             GetPrivateProfileString(section, key, "", s1, 100, IniFileName);
             return Double.Parse(s1.ToString());
         }
+        public Boolean _GetBool(String section, String key)
+        {
+            StringBuilder s1 = new StringBuilder(100);
+            GetPrivateProfileString(section, key, "", s1, 100, IniFileName);
+            return  Boolean.Parse(s1.ToString());
+        }
         public void _SetString(String section, String key, String val)
         {
             WritePrivateProfileString(section, key, val, IniFileName);
@@ -3794,6 +3801,10 @@ using HANDLE = System.IntPtr;
             WritePrivateProfileString(section, key, val.ToString(), IniFileName);
         }
         public void _SetDouble(String section, String key, Double val)
+        {
+            WritePrivateProfileString(section, key, val.ToString(), IniFileName);
+        }
+        public void _SetBool(String section, String key, Boolean val)
         {
             WritePrivateProfileString(section, key, val.ToString(), IniFileName);
         }
