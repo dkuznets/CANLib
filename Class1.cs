@@ -1947,7 +1947,7 @@ using HANDLE = System.IntPtr;
             if (CAN200_OK != result)
             {
                 if (ErrEvent != null)
-                    ErrEvent(this, new MyEventArgs("Не могу прочитать конфиг"));
+                    ErrEvent(this, new MyEventArgs("Не могу прочитать конфиг " + result.ToString()));
                 return false;
             }
             Info = Encoding.Default.GetString(buf.szName, 0, 128);
