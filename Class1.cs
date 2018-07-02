@@ -2957,7 +2957,7 @@ using HANDLE = System.IntPtr;
                 }
                 if (ret == 0)
                 {
-                    Trace.WriteLine("thread timeout");
+//                    Trace.WriteLine("thread timeout");
                     continue;
                 }
                 else if (ret > 0)
@@ -2998,7 +2998,7 @@ using HANDLE = System.IntPtr;
                 }
                 else
                 {
-                    Trace.WriteLine("thread timeout");
+//                    Trace.WriteLine("thread timeout");
 //                    if (ErrEvent != null)
 //                        ErrEvent(this, new MyEventArgs("Не удалось принять сообщение"));
 //                    continue;
