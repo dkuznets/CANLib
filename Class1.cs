@@ -1769,94 +1769,94 @@ using HANDLE = System.IntPtr;
         #endregion
         #region Импорт функций из ДЛЛ
 
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_GetNumberDevice(ref int count);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern HANDLE CAN200_Open(int number);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_Close(HANDLE Handle);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_SetWorkMode(HANDLE Handle, int Channel, int Mode);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_GetWorkMode(HANDLE Handle, int Channel, ref int Mode);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_SetDriverMode(HANDLE Handle, int Channel, int Mode);
         //
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_GetConfig(HANDLE Handle, ref TCAN_VPDData Buffer);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_SetCANSpeed(HANDLE Handle, int Channel, uint Speed);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_GetCANSpeed(HANDLE Handle, int Channel, ref uint Speed);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_GetStatus(HANDLE Handle, int Channel, ref int Status);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_SetInterruptSource(HANDLE Handle, int Channel, int Source);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_GetInterruptSource(HANDLE Handle, int Channel, ref int Source);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_SetCommand(HANDLE Handle, int Channel, int Command);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_SetTxBuffer(HANDLE Handle, int Channel, ref RX_TX_Buffer Buffer);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_DefEvent(HANDLE Handle, int Channel, HANDLE hEvent);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_GetEventData(HANDLE Handle, int Channel, ref TEventData Buffer);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_GetRxBuffer(HANDLE Handle, int Channel, ref RX_TX_Buffer Buffer);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_B_SetInputFilter(HANDLE Handle, int Channel, ref bFilter_t filter);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_B_GetInputFilter(HANDLE Handle, int Channel, ref bFilter_t filter);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_P_SetInputFilter(HANDLE Handle, int Channel, ref pFilter_t filter);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_P_GetInputFilter(HANDLE Handle, int Channel, ref pFilter_t filter);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_P_SetRxErrorCounter(HANDLE Handle, int Channel, int Counter);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_P_GetRxErrorCounter(HANDLE Handle, int Channel, ref int Counter);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_P_SetTxErrorCounter(HANDLE Handle, int Channel, int Counter);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_P_GetTxErrorCounter(HANDLE Handle, int Channel, ref int Counter);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_P_SetErrorWarningLimit(HANDLE Handle, int Channel, int Limit);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_P_GetErrorWarningLimit(HANDLE Handle, int Channel, ref int Limit);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_P_GetArbitrationLostCapture(HANDLE Handle, int Channel, ref int Data);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_P_GetRxMessageCounter(HANDLE Handle, int Channel, ref int Counter);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_P_GetErrorCode(HANDLE Handle, int Channel, ref int Code);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_GetOverCounter(HANDLE Handle, int Channel, ref int Counter);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_SetCANReg(HANDLE Handle, int Channel, int Port, int Data);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_GetCANReg(HANDLE Handle, int Channel, int Port, ref int Data);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_Recv(HANDLE Handle, int Channel, ref RX_TX_Buffer Buffer, int timeout);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_HardReset(HANDLE Handle, int Channel);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_GetLastError();
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern UInt64 CAN200_GetAPIVer();
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_RecvPack(HANDLE Handle, int Channel, ref int count, int timeout);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern Byte CAN200_GetByte(int num);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern void CAN200_Recv_Enable(HANDLE Handle, int Channel, int timeout);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern void CAN200_Recv_Disable();
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_Pop(ref RX_TX_Buffer buf);
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_VecSize();
-        [DllImport(@"elcusCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        [DllImport(@"elcusCAN15.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern int CAN200_ClearBuf(HANDLE Handle, int Channel);
         #endregion
 
