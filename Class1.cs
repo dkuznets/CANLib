@@ -2850,7 +2850,7 @@ using HANDLE = System.IntPtr;
             if (timeout <= 0)
             {
                 Trace.WriteLine("MCAN RecvPack Error timeout");
-//                return false;
+                return false;
             }
             for (int i = 0; i < count; i++)
             {
