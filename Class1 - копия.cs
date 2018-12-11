@@ -1549,7 +1549,6 @@ using HANDLE = System.IntPtr;
 
     
     #endregion
-
     #region ECANConverter
     public class ECANConverter : IUCANConverter
     {
@@ -3468,6 +3467,7 @@ using HANDLE = System.IntPtr;
     }
     #endregion
 
+
     #region MCANConverter
     public class MCANConverter : IUCANConverter
     {
@@ -4100,6 +4100,366 @@ using HANDLE = System.IntPtr;
             CiHwReset(0);
         }
     }    
+    #endregion
+    #region M2CANConverter
+    public class M2CANConverter : IUCANConverter
+    {
+        public event MyDelegate ErrEvent;
+        public event MyDelegate Progress;
+
+        public canerrs_t errs = new canerrs_t();
+        public canwait_t cw = new canwait_t();
+        public canmsg_t frame = new canmsg_t();
+        Boolean flag_thr = true;
+        List<canmsg_t> mbuf = new List<canmsg_t>();
+        Thread thr;
+        Mutex mtx = new Mutex();
+        /*
+        EXPORT Int16 __stdcall MarCAN_Open(UInt16 speed);
+        EXPORT Int16 __stdcall MarCAN_Close(void);
+        EXPORT Int16 __stdcall MarCAN_SetCANSpeed(UInt16 speed);
+        EXPORT Int16 __stdcall MarCAN_ClearRX(void);
+        EXPORT Int16 __stdcall MarCAN_GetStatus(chipstat_t *Status);
+        EXPORT Int16 __stdcall MarCAN_Write(pRX_TX_Buffer Buffer);
+        EXPORT Int16 __stdcall MarCAN_GetErrorCounter(canerrs_t *Counter);
+        EXPORT Int16 __stdcall MarCAN_HardReset(HANDLE Handle, int Channel);
+        EXPORT UINT64 __stdcall MarCAN_GetAPIVer(void);
+        EXPORT BYTE __stdcall MarCAN_GetByte(int num);
+        EXPORT void __stdcall MarCAN_Recv_Enable(void);
+        EXPORT void __stdcall MarCAN_Recv_Disable(void);
+        EXPORT Int16 __stdcall MarCAN_Pop(pRX_TX_Buffer Buffer);
+        EXPORT Int16 __stdcall MarCAN_VecSize(void);
+        */
+        #region Импорт функций из ДЛЛ
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_Open(UInt16 speed);
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_Close();
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_SetCANSpeed(UInt16 speed);
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_ClearRX();
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_GetStatus(ref chipstat_t Status);
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_Write(ref canmsg_t Buffer);
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_GetErrorCounter(ref canerrs_t Counter);
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_HardReset();
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern UInt64 MarCAN_GetAPIVer();
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Byte MarCAN_GetByte(int num);
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern void MarCAN_Recv_Enable();
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern void MarCAN_Recv_Disable();
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_Pop(ref canmsg_t Buffer);
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_VecSize();
+        [DllImport(@"marCAN.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Int16 MarCAN_BoardInfo(ref canboard_t binfo);
+        #endregion
+        public M2CANConverter()
+        {
+            Port = 0;
+            Speed = 0;
+            Is_Open = false;
+        }
+        public String Info
+        {
+            set;
+            get;
+        }
+        public Byte Port
+        {
+            set;
+            get;
+        }
+        public Byte Speed
+        {
+            set;
+            get;
+        }
+        public Boolean Is_Open
+        {
+            get;
+            set;
+        }
+        public Boolean Is_Present
+        {
+            get
+            {
+                if (Open())
+                {
+                    Close();
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            set
+            {
+            }
+        }
+        public String GetAPIVer
+        {
+            get
+            {
+                UInt64 ver = MarCAN_GetAPIVer(); //#define VER 0x0000290120161346
+                int a1 = (int)(ver >> 40);
+                int a2 = (int)(ver >> 32) & 0xFF;
+                int a3 = (int)(ver >> 16) & 0xFFFF;
+                int a4 = (int)(ver >> 8) & 0xFF;
+                int a5 = (int)(ver & 0xFF);
+
+                return a1.ToString("X02") + "." + a2.ToString("X02") + "." + a3.ToString("X04") + " " + a4.ToString("X02") + ":" + a5.ToString("X02");
+            }
+            set { }
+        }
+        public Boolean Open()
+        {
+            try
+            {
+                if (MarCAN_Open(Speed) < 0)
+                {
+                    if (ErrEvent != null)
+                        ErrEvent(this, new MyEventArgs("Не могу открыть CAN"));
+                    Is_Open = false;
+                    return false;
+                }
+            }
+            catch (Exception)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не могу открыть CAN"));
+                Is_Open = false;
+                return false;
+            }
+
+            canboard_t binfo = new canboard_t();
+            binfo.brdnum = 0;
+            if (MarCAN_BoardInfo(ref binfo) < 0)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не подключен адаптер"));
+                return false;
+            }
+
+            Info = new String(binfo.name, 3, 13) + " (" + new String(binfo.manufact, 3, 20) + ")";
+
+            cw.chan = Port;
+            cw.wflags = Const.CI_WAIT_RC | Const.CI_WAIT_ER;
+            frame.data = new Byte[8];
+            canerrs_t errs = new canerrs_t();
+            MarCAN_GetErrorCounter(ref errs);
+            Is_Open = true;
+            return true;
+        }
+        public void Close()
+        {
+            if (thr != null)
+                if (thr.IsAlive)
+                    thr.Abort();
+            thr = null;
+            MarCAN_Close();
+            Is_Open = false;
+        }
+        public Boolean Send(ref canmsg_t msg)
+        {
+            canerrs_t ce = new canerrs_t();
+            MarCAN_GetErrorCounter(ref ce);
+
+            if (MarCAN_Write(ref msg) < 0)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не удалось отправить сообщение"));
+                return false;
+            }
+            else
+            {
+#if DDDM
+                Trace.Write("M2 Send data: ");
+                print_RX_TX(msg);
+#endif
+                return true;
+            }
+        }
+        public Boolean Send(ref canmsg_t msg, int timeout)
+        {
+            canerrs_t ce = new canerrs_t();
+            MarCAN_GetErrorCounter(ref ce);
+
+            if (MarCAN_Write(ref msg) < 0)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не удалось отправить сообщение"));
+                return false;
+            }
+            else
+            {
+#if DDDM
+                Trace.Write("M2 Send data: ");
+                print_RX_TX(msg);
+#endif
+                return true;
+            }
+        }
+        public Boolean Recv(ref canmsg_t msg, int timeout)
+        {
+            int cnt = 0;
+            do
+            {
+                cnt = vecsize();
+                Thread.Sleep(1);
+            } while (cnt < 1 && (Int32)timeout-- > 0);
+            if ((Int32)timeout <= 0)
+                return false;
+            pop(ref msg);
+#if DDDM
+            Trace.Write("M2 Recv data: ");
+            print_RX_TX(msg);
+            Trace.WriteLine("");
+#endif
+            return true;
+        }
+        public Boolean RecvPack(ref Byte[] arr, ref int count, int timeout)
+        {
+            canmsg_t mm = new canmsg_t();
+            mm.data = new Byte[8];
+            int cnt = 0;
+            do
+            {
+                cnt = vecsize();
+                Thread.Sleep(1);
+            } while (cnt < count && timeout-- > 0);
+#if DDDM
+            Trace.WriteLine("M2CAN packets: " + cnt.ToString());
+#endif
+            if (timeout <= 0)
+            {
+                Trace.WriteLine("MCAN RecvPack Error timeout");
+                //                return false;
+            }
+            for (int i = 0; i < count; i++)
+            {
+                //                Application.DoEvents();
+                pop(ref mm);
+                //                print_RX_TX(mm);
+                for (int j = 0; j < mm.len; j++)
+                {
+                    if ((i * 8 + j) < arr.Length)
+                        arr[i * 8 + j] = mm.data[j];
+                }
+                Application.DoEvents();
+
+                if (Progress != null)
+                    Progress(this, new MyEventArgs(i));
+                //                Application.DoEvents();
+            }
+            //mbuf.RemoveAt(0);
+            //mbuf.RemoveRange(0, count);
+            return true;
+        }
+        public Boolean SendCmd(ref canmsg_t msg, int timeout)
+        {
+            if (!Send(ref msg))
+                return false;
+            if (!Recv(ref msg, timeout))
+                return false;
+            return true;
+        }
+        public int GetStatus()
+        {
+            int result = 0;
+            return result;
+        }
+        public void Recv_Enable()
+        {
+            Trace.WriteLine("Marathon2 Recv enable");
+            if (vecsize() > 0)
+            {
+                mtx.WaitOne();
+                mbuf.Clear();
+                mtx.ReleaseMutex();
+            }
+            MarCAN_Recv_Enable();
+        }
+        public void Recv_Disable()
+        {
+            Trace.WriteLine("Marathon Recv disable");
+            if (vecsize() > 0)
+            {
+                mtx.WaitOne();
+                mbuf.Clear();
+                mtx.ReleaseMutex();
+            }
+            MarCAN_Recv_Disable();
+        }
+        ~M2CANConverter()
+        {
+            if (Is_Open)
+                Close();
+        }
+        void print_RX_TX(canmsg_t mm)
+        {
+            Trace.Write("ID=" + mm.id.ToString("X2") + " len=" + mm.len.ToString());
+            Trace.Write(" Data:");
+            for (int i = 0; i < mm.len; i++)
+                Trace.Write(" 0x" + mm.data[i].ToString("X2"));
+            Trace.WriteLine("");
+        }
+        public void Clear_RX()
+        {
+            MarCAN_ClearRX();
+            if (mbuf.Count > 0)
+                mbuf.Clear();
+        }
+        public int VectorSize()
+        {
+            mtx.WaitOne();
+            int ii = mbuf.Count;
+            mtx.ReleaseMutex();
+            return ii;
+        }
+        int vecsize()
+        {
+            mtx.WaitOne();
+            int ii = mbuf.Count;
+            mtx.ReleaseMutex();
+            return ii;
+        }
+        void push_back(canmsg_t msg)
+        {
+            mtx.WaitOne();
+            mbuf.Add(msg);
+            mtx.ReleaseMutex();
+        }
+        Boolean pop(ref canmsg_t msg)
+        {
+            mtx.WaitOne();
+            if (mbuf.Count >= 1)
+            {
+                msg = mbuf[0];
+                mbuf.RemoveAt(0);
+                mtx.ReleaseMutex();
+                return true;
+            }
+            else
+            {
+                mtx.ReleaseMutex();
+                return false;
+            }
+        }
+        public void HWReset()
+        {
+            MarCAN_HardReset();
+        }
+    }
     #endregion
 
     #region FCANConverter
