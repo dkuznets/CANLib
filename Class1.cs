@@ -2507,6 +2507,967 @@ using HANDLE = System.IntPtr;
 
     }
     #endregion
+
+    #region ECAN18Converter
+    public class ECAN18Converter : IUCANConverter
+    {
+        public event MyDelegate ErrEvent;
+        public event MyDelegate Progress;
+
+        #region Всякая шняга
+        public const int CAN200_OK = 0;	//< Операция завершена успешно
+        public const int CAN200_ERR_PARM = -1;	//< Ошибка входных параметров
+        public const int CAN200_ERR_SYS = -2;	//< Системная ошибка
+        public const int CAN200_ERR_MODE = -3;	//< Режим работы не соответствует требуемому
+        public const int CAN200_ERR_BUSY = -4;	//< Буфер выдачи занят
+
+        public const int NUM_CHANNEL = 2;	//< Количество каналов на плате
+
+        public const int CAN_CHANNEL_1 = 1;	//<Первый канал платы
+        public const int CAN_CHANNEL_2 = 2;	//<Второй канал платы
+
+        // Максимальное количество плат.
+        public const int MAX_CAN_NUMBER = 10;
+
+        public const int BasicCAN = 0;	///< Основной режим
+        public const int PeliCAN = 1;	///< Расширенный режим
+
+        //Speed
+        int CAN_SPEED_USER_DEFINED(int btr0, int btr1)		//< Скорость определенная пользователем
+        {
+            return 0xffff | (((btr0) & 0xff) << 24) | (((btr1) & 0xff) << 16);
+        }
+        int IS_CAN_SPEED_USER_DEFINED(int speed)	//< 1 - скорость определяемая пользователем, 0 - одна из стандартных скоростей
+        {
+            return (0xffff == ((speed) & 0xffff)) ? 1 : 0;
+        }
+        int CAN_SPEED_GET_BTR0(int speed)
+        {
+            return ((speed) >> 24) & 0xff;	//< Возвращает значение регсистра BTR0 для скоростей задаваемых пользователем
+        }
+        int CAN_SPEED_GET_BTR1(int speed) //< Возвращает значение регсистра BTR1 для скоростей задаваемых пользователем 
+        {
+            return ((speed) >> 16) & 0xff;
+        }
+        public const int CAN_SPEED_1000 = 1000;	//< Скорость 1 Mbit/sec 
+        public const int CAN_SPEED_800 = 800;		//< Скорость 800 kbit/sec 
+        public const int CAN_SPEED_500 = 500;		//< Скорость 500 kbit/sec 
+        public const int CAN_SPEED_250 = 250;		//< Скорость 250 kbit/sec 
+        public const int CAN_SPEED_125 = 125;		//< Скорость 125 kbit/sec 
+        public const int CAN_SPEED_50 = 50;		//< Скорость 50 kbit/sec 
+        public const int CAN_SPEED_20 = 20;		//< Скорость 20 kbit/sec 
+        public const int CAN_SPEED_10 = 10;		//< Скорость 10 kbit/sec 
+
+        public const int FILE_DEVICE_CAN200 = 0x8000;
+
+        public const int V_HardReset = 0;
+        public const int V_SetWorkMode = 1;
+        public const int V_GetWorkMode = 2;
+        public const int V_SetDriverMode = 3;
+        public const int V_SetCANSpeed = 4;
+        public const int V_GetStatus = 5;
+        public const int V_SetInterruptSource = 6;
+        public const int V_SetTxBuffer = 7;
+        public const int V_GetRxBuffer = 8;
+        public const int V_SetCommand = 9;
+        public const int V_B_SetInputFilter = 10;
+        public const int V_P_SetRxErrorCounter = 11;
+        public const int V_P_GetRxErrorCounter = 12;
+        public const int V_P_SetTxErrorCounter = 13;
+        public const int V_P_GetTxErrorCounter = 14;
+        public const int V_P_SetErrorWarningLimit = 15;
+        public const int V_P_GetErrorWarningLimit = 16;
+        public const int V_P_GetArbitrationLostCapture = 17;
+        public const int V_P_GetRxMessageCounter = 18;
+        public const int V_P_GetErrorCode = 19;
+        public const int V_P_SetInputFilter = 20;
+        public const int V_DefEvent = 21;
+        public const int V_GetEventData = 22;
+        public const int V_GetConfig = 23;
+        public const int V_GetCANSpeed = 24;
+        public const int V_B_GetInputFilter = 25;
+        public const int V_P_GetInputFilter = 26;
+        public const int V_SetCANReg = 27;
+        public const int V_GetCANReg = 28;
+        public const int V_GetInterruptSource = 29;
+        public const int V_GetOverCounter = 30;
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct TUniCanMessage
+        {
+            public UInt32 messageID;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
+            public Byte[] data;
+            public Byte length;
+            //служебные идентификаторы
+            public Byte RTR;		//признак RTR
+            public Byte EFF;		//признак расширенного идентификатора (29 бит)
+            public UInt32 time;
+        };// END STRUCTURE DEFINITION TCanOlsMessage
+
+        public enum CAN_ChannelBaudRate
+        {
+            CAN_BR_1000k,
+            CAN_BR_800k,
+            CAN_BR_500k,
+            CAN_BR_250k,
+            CAN_BR_125k,
+            CAN_BR_50k,
+            CAN_BR_20k,
+            CAN_BR_10k,
+            CAN_BR_ALL
+        };
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct TCAN_VPDData
+        {
+            //Имя платы Строка вида CAN-200PCI(e) vX.Y, где vX.Y – номер версии платы
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 128)]
+            public Byte[] szName;
+            // Серийный номер платы
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 10)]
+            public char[] szSN;
+            //Базовый адрес первого канала
+            public ushort wPorts1;
+            //Базовый адрес второго канала
+            public ushort wPorts2;
+            //Номер вектора прерывания
+            public ushort wIRQ;
+        };
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct RX_TX_Buffer
+        {
+            // #BasicCAN - стандартный кадр #PeliCAN - расширенный кадр
+            public ushort FF; //Стандартный идентификатор 11-ти битный идентификатор принятого кадра (действителен только при #FF = #BasicCAN)
+            public ushort sID;         //стандартный идентификатор (11 бит) 
+            //Расширенный идентификатор 29-ти битный идентификатор принятого кадра (действителен только при #FF = #PeliCAN)
+            public uint extID;
+            //Значение бита RTR (0 или 1)
+            public ushort RTR;         // RTR - бит                         //
+            //Количество принятых/выдаваемых байт данных (0-8)
+            public ushort DLC;
+            //Выдаваемые/принимаемые данные (от 0 до 8 байт) Реальное количество принимаемых/выдаваемых данных определяется полем #DLC
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
+            public ushort[] DataByte;
+            public RX_TX_Buffer(int i)
+                : this()
+            {
+                DataByte = new ushort[8] { 0, 0, 0, 0, 0, 0, 0, 0 };
+                FF = 0;
+                sID = 0;
+                extID = 0;
+                RTR = 0;
+                DLC = 0;
+            }
+        };
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct TEventData
+        {
+            //Принятый кадр Поля структуры содержат действительные значения только при #IntrID = 1
+            public RX_TX_Buffer rxtxbuf;
+            //Причина установки события Содержимое регистра идентификации прерывания CAN-контроллера канала
+            public char IntrID;
+        };
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct bFilter_t
+        {
+            //Идентификатор входного фильтра
+            public ushort Code;
+            //Маска входного фильтра
+            public ushort Mask;
+        };
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct pFilter_t
+        {
+            //Идентификатор входного фильтра
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+            public ushort[] Filter;
+            //Маска входного фильтра
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+            public ushort[] Mask;
+            //Режим функционирования входного фильтра 0 - одиночный фильтр 1 - двойной фильтр
+            public ushort Mode;
+        };
+        [Flags]
+        public enum bit : int
+        {
+            rbs = 1,
+            dos = 2,
+            tbs = 4,
+            tcs = 8,
+            rs = 16,
+            ts = 32,
+            es = 64,
+            bs = 128
+        }
+
+        //        [Flags]
+        public enum bit2 : int
+        {
+            rbs = 1,
+            dos = 2,
+            tbs = 4,
+            tcs = 8,
+            rs = 16,
+            ts = 32,
+            es = 64,
+            bs = 128
+        }
+
+        [StructLayout(LayoutKind.Explicit, Pack = 1)]
+        public struct CAN_status_t
+        {
+            [FieldOffset(0)]
+            public bit _bit;
+            [FieldOffset(0)]
+            public int _byte;
+        };
+        #endregion
+        #region Импорт функций из ДЛЛ
+
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_GetNumberDevice(ref int count);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern HANDLE CAN200_Open(int number);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_Close(HANDLE Handle);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_SetWorkMode(HANDLE Handle, int Channel, int Mode);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_GetWorkMode(HANDLE Handle, int Channel, ref int Mode);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_SetDriverMode(HANDLE Handle, int Channel, int Mode);
+        //
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_GetConfig(HANDLE Handle, ref TCAN_VPDData Buffer);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_SetCANSpeed(HANDLE Handle, int Channel, uint Speed);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_GetCANSpeed(HANDLE Handle, int Channel, ref uint Speed);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_GetStatus(HANDLE Handle, int Channel, ref int Status);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_SetInterruptSource(HANDLE Handle, int Channel, int Source);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_GetInterruptSource(HANDLE Handle, int Channel, ref int Source);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_SetCommand(HANDLE Handle, int Channel, int Command);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_SetTxBuffer(HANDLE Handle, int Channel, ref RX_TX_Buffer Buffer);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_DefEvent(HANDLE Handle, int Channel, HANDLE hEvent);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_GetEventData(HANDLE Handle, int Channel, ref TEventData Buffer);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_GetRxBuffer(HANDLE Handle, int Channel, ref RX_TX_Buffer Buffer);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_B_SetInputFilter(HANDLE Handle, int Channel, ref bFilter_t filter);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_B_GetInputFilter(HANDLE Handle, int Channel, ref bFilter_t filter);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_P_SetInputFilter(HANDLE Handle, int Channel, ref pFilter_t filter);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_P_GetInputFilter(HANDLE Handle, int Channel, ref pFilter_t filter);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_P_SetRxErrorCounter(HANDLE Handle, int Channel, int Counter);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_P_GetRxErrorCounter(HANDLE Handle, int Channel, ref int Counter);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_P_SetTxErrorCounter(HANDLE Handle, int Channel, int Counter);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_P_GetTxErrorCounter(HANDLE Handle, int Channel, ref int Counter);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_P_SetErrorWarningLimit(HANDLE Handle, int Channel, int Limit);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_P_GetErrorWarningLimit(HANDLE Handle, int Channel, ref int Limit);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_P_GetArbitrationLostCapture(HANDLE Handle, int Channel, ref int Data);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_P_GetRxMessageCounter(HANDLE Handle, int Channel, ref int Counter);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_P_GetErrorCode(HANDLE Handle, int Channel, ref int Code);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_GetOverCounter(HANDLE Handle, int Channel, ref int Counter);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_SetCANReg(HANDLE Handle, int Channel, int Port, int Data);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_GetCANReg(HANDLE Handle, int Channel, int Port, ref int Data);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_Recv(HANDLE Handle, int Channel, ref RX_TX_Buffer Buffer, int timeout);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_HardReset(HANDLE Handle, int Channel);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_GetLastError();
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern UInt64 CAN200_GetAPIVer();
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_RecvPack(HANDLE Handle, int Channel, ref int count, int timeout);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern Byte CAN200_GetByte(int num);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern void CAN200_Recv_Enable(HANDLE Handle, int Channel, int timeout);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern void CAN200_Recv_Disable();
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_Pop(ref RX_TX_Buffer buf);
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_VecSize();
+        [DllImport(@"elcusCAN18.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern int CAN200_ClearBuf(HANDLE Handle, int Channel);
+        #endregion
+
+        HANDLE hCan = IntPtr.Zero;
+
+        int port = CAN_CHANNEL_1;
+        uint speed = CAN_SPEED_1000;
+        int mode = PeliCAN;
+        //        int mode = BasicCAN;
+        public ECAN18Converter()
+        {
+            Port = 0;
+            Speed = 0;
+            Is_Open = false;
+        }
+        public String Info
+        {
+            get;
+            set;
+        }
+        public Byte Port
+        {
+            get;
+            set;
+        }
+        public Byte Speed
+        {
+            get;
+            set;
+        }
+        public Boolean Is_Open
+        {
+            get;
+            set;
+        }
+        public Boolean Is_Present
+        {
+            get
+            {
+                int result;
+                int count = 0;
+                result = CAN200_GetNumberDevice(ref count);
+                if (CAN200_OK != result)
+                {
+                    if (ErrEvent != null)
+                        ErrEvent(this, new MyEventArgs("Плата не установлена!"));
+                    return false;
+                }
+                if (0 < count)
+                {
+                    return true;
+                }
+                return false;
+            }
+            set
+            {
+            }
+        }
+        public String GetAPIVer
+        {
+            get
+            {
+                UInt64 ver = CAN200_GetAPIVer(); //#define VER 0x0000290120161346
+                int a1 = (int)(ver >> 40);
+                int a2 = (int)(ver >> 32) & 0xFF;
+                int a3 = (int)(ver >> 16) & 0xFFFF;
+                int a4 = (int)(ver >> 8) & 0xFF;
+                int a5 = (int)(ver & 0xFF);
+
+                return a1.ToString("X02") + "." + a2.ToString("X02") + "." + a3.ToString("X04") + " " + a4.ToString("X02") + ":" + a5.ToString("X02");
+            }
+            set { }
+        }
+        public Boolean Open()
+        {
+
+            hCan = CAN200_Open(0);
+            if (null == hCan)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Ошибка открытия контроллера"));
+                return false;
+            }
+            int result = 0;
+
+            TCAN_VPDData buf = new TCAN_VPDData();
+            result = CAN200_GetConfig(hCan, ref buf);
+            if (CAN200_OK != result)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не могу прочитать конфиг " + result.ToString()));
+                return false;
+            }
+            Info = Encoding.Default.GetString(buf.szName, 0, 128);
+            Info = "Elcus " + Info.Substring(0, Info.IndexOf('\0')).Trim();
+
+            if (Port == 0)
+                port = CAN_CHANNEL_1;
+            else
+                port = CAN_CHANNEL_2;
+
+            result = CAN200_SetWorkMode(hCan, 1, mode);
+            if (CAN200_OK != result)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не могу установить режим 1"));
+                return false;
+            }
+            result = CAN200_GetWorkMode(hCan, 1, ref mode);
+            Trace.WriteLine("-- WorkMode 1 = " + mode.ToString() + " --");
+
+            // Разрешаем работы выходных формирователей
+            result = CAN200_SetDriverMode(hCan, 1, 0x1B);
+            if (CAN200_OK != result)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не могу установить фильтр 1"));
+                return false;
+            }
+            // Разрешаем прием всех кадров
+            pFilter_t filterP = new pFilter_t();
+            filterP.Filter = new ushort[4];
+            filterP.Mask = new ushort[4];
+            filterP.Filter[0] = filterP.Filter[1] = filterP.Filter[2] = filterP.Filter[3] = 0xff;
+            filterP.Mask[0] = filterP.Mask[1] = filterP.Mask[2] = filterP.Mask[3] = 0xff;
+            filterP.Mode = 0;
+
+            bFilter_t filterB = new bFilter_t();
+            filterB.Code = 0x00;
+            filterB.Mask = 0xff;
+
+            if (mode == BasicCAN)
+            {
+                result = CAN200_B_SetInputFilter(hCan, 1, ref filterB);
+                if (CAN200_OK != result)
+                {
+                    if (ErrEvent != null)
+                        ErrEvent(this, new MyEventArgs("Не могу установить фильтр 1"));
+                    return false;
+                }
+            }
+            else
+            {
+                result = CAN200_P_SetInputFilter(hCan, 1, ref filterP);
+                if (CAN200_OK != result)
+                {
+                    if (ErrEvent != null)
+                        ErrEvent(this, new MyEventArgs("Не могу установить фильтр 1"));
+                    return false;
+                }
+            }
+
+            switch (Speed)
+            {
+                case 0:
+                    speed = CAN_SPEED_1000;
+                    break;
+                case 1:
+                    speed = CAN_SPEED_800;
+                    break;
+                case 2:
+                    speed = CAN_SPEED_500;
+                    break;
+                case 3:
+                    speed = CAN_SPEED_250;
+                    break;
+                case 4:
+                    speed = CAN_SPEED_125;
+                    break;
+                case 5:
+                    speed = CAN_SPEED_50;
+                    break;
+                case 6:
+                    speed = CAN_SPEED_20;
+                    break;
+                case 7:
+                    speed = CAN_SPEED_10;
+                    break;
+                default:
+                    speed = CAN_SPEED_1000;
+                    break;
+            }
+
+            result = CAN200_SetCANSpeed(hCan, 1, speed);
+            speed = 0;
+            result = CAN200_GetCANSpeed(hCan, 1, ref speed);
+            Trace.WriteLine("-- speed 1 = " + speed.ToString() + " --");
+            if (CAN200_OK != result)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не могу установить скорость 1"));
+                return false;
+            }
+
+            if (mode == PeliCAN)
+            {
+                result = CAN200_P_SetErrorWarningLimit(hCan, 1, 255);
+                if (CAN200_OK != result)
+                {
+                    if (ErrEvent != null)
+                        ErrEvent(this, new MyEventArgs("Не могу установить лимит ошибок 1"));
+                    return false;
+                }
+            }
+            // Разрешаем прерывания по приему кадра
+            result = CAN200_SetInterruptSource(hCan, port, 0x01);
+            if (CAN200_OK != result)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не могу включить прерывание"));
+                return false;
+            }
+
+            //CAN200_GetOverCounter(hCan, port, ref result);
+            //Trace.WriteLine("!!GetOverCounter " + result.ToString());
+
+            Is_Open = true;
+            //Recv_Enable();
+            return true;
+        }
+        public void Close()
+        {
+            try
+            {
+                CAN200_Close(hCan);
+            }
+            catch (Exception)
+            {
+
+            }
+            Is_Open = false;
+        }
+        public Boolean Send(ref canmsg_t msg)
+        {
+            int result = 0;
+            CAN200_HardReset(hCan, port);
+            if (mode == PeliCAN)
+            {
+                result = CAN200_P_SetTxErrorCounter(hCan, port, 0);
+                if (CAN200_OK != result)
+                {
+                    if (ErrEvent != null)
+                        ErrEvent(this, new MyEventArgs("Не удалось сбросить счетчик ошибок " + result.ToString()));
+                    Trace.WriteLine("Не удалось сбросить счетчик ошибок " + result.ToString());
+                    return false;
+                }
+            }
+            result = CAN200_SetCommand(hCan, port, 6);
+            if (CAN200_OK != result)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не удалось очистить буфер " + result.ToString()));
+                Trace.WriteLine("Не удалось очистить буфер " + result.ToString());
+                return false;
+            }
+            RX_TX_Buffer buf = new RX_TX_Buffer(1);
+            buf.sID = (ushort)msg.id;
+            buf.DLC = msg.len;
+            buf.FF = 0;
+
+            for (int i = 0; i < msg.len; i++)
+                buf.DataByte[i] = msg.data[i];
+
+#if DDDE
+            Trace.Write("Send data: ");
+            print_RX_TX(buf);
+#endif
+            result = CAN200_SetTxBuffer(hCan, port, ref buf);
+            if (CAN200_OK != result)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не удалось поместить пакет в буфер " + result.ToString()));
+                Trace.WriteLine("Не удалось поместить пакет в буфер " + result.ToString());
+                return false;
+            }
+            result = CAN200_SetCommand(hCan, port, 1);
+            if (CAN200_OK != result)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не удалось отправить сообщение 3 " + result.ToString()));
+                Trace.WriteLine("Не удалось отправить сообщение 3 " + result.ToString());
+                return false;
+            }
+            int to = 2000;
+            do
+            {
+                CAN200_GetStatus(hCan, port, ref result);
+                //                Trace.WriteLine("No send finished " + to.ToString() + " " + ((bit)result).ToString() + " tbs=" + (result & 4).ToString() + " tcs=" + (result & 8).ToString());
+                Thread.Sleep(1);
+            } while (((result & 4) == 0) & ((result & 8) == 0) & (to-- > 0));
+            if (to <= 0)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не удалось отправить сообщение 4 " + ((bit)result).ToString()));
+                Trace.WriteLine("Не удалось отправить сообщение 4 " + ((bit)result).ToString());
+                return false;
+            }
+            return true;
+        }
+        public Boolean Send(ref canmsg_t msg, int timeout)
+        {
+            int result = 0;
+            CAN200_HardReset(hCan, port);
+            if (mode == PeliCAN)
+            {
+                result = CAN200_P_SetTxErrorCounter(hCan, port, 0);
+                if (CAN200_OK != result)
+                {
+                    if (ErrEvent != null)
+                        ErrEvent(this, new MyEventArgs("Не удалось сбросить счетчик ошибок " + result.ToString()));
+                    Trace.WriteLine("Не удалось сбросить счетчик ошибок " + result.ToString());
+                    return false;
+                }
+            }
+            result = CAN200_SetCommand(hCan, port, 6);
+            if (CAN200_OK != result)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не удалось очистить буфер " + result.ToString()));
+                Trace.WriteLine("Не удалось очистить буфер " + result.ToString());
+                return false;
+            }
+            RX_TX_Buffer buf = new RX_TX_Buffer(1);
+            buf.sID = (ushort)msg.id;
+            buf.DLC = msg.len;
+            buf.FF = 0;
+
+            for (int i = 0; i < msg.len; i++)
+                buf.DataByte[i] = msg.data[i];
+            //            Clear_RX();
+#if DDDE
+            Trace.Write("Send data: ");
+            print_RX_TX(buf);
+#endif
+            result = CAN200_SetTxBuffer(hCan, port, ref buf);
+            if (CAN200_OK != result)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не удалось поместить пакет в буфер " + result.ToString()));
+                Trace.WriteLine("Не удалось поместить пакет в буфер " + result.ToString());
+                return false;
+            }
+            result = CAN200_SetCommand(hCan, port, 1);
+            if (CAN200_OK != result)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не удалось отправить сообщение 3 " + result.ToString()));
+                Trace.WriteLine("Не удалось отправить сообщение 3 " + result.ToString());
+                return false;
+            }
+            int to = (int)timeout;
+            do
+            {
+                CAN200_GetStatus(hCan, port, ref result);
+                //                Trace.WriteLine("No send finished " + to.ToString() + " " + ((bit)result).ToString() + " tbs=" + (result & 4).ToString() + " tcs=" + (result & 8).ToString());
+                Thread.Sleep(1);
+            } while (((result & 4) == 0) & ((result & 8) == 0) & (to-- > 0));
+            if (to <= 0)
+            {
+                if (ErrEvent != null)
+                    ErrEvent(this, new MyEventArgs("Не удалось отправить сообщение 4 " + ((bit)result).ToString()));
+                Trace.WriteLine("Не удалось отправить сообщение 4 " + ((bit)result).ToString());
+                return false;
+            }
+            return true;
+        }
+        public Boolean Recv(ref canmsg_t msg, int timeout)
+        {
+            int result = 0;
+            int i = 0, j = 0;
+            RX_TX_Buffer ret = new RX_TX_Buffer(1);
+            do
+            {
+                result = CAN200_VecSize();
+                Thread.Sleep(1);
+            } while (result < 1 && (Int32)timeout-- > 0);
+            if ((Int32)timeout <= 0)
+            {
+                Trace.WriteLine("Recv Error timeout");
+                return false;
+            }
+#if DDDE
+            Trace.WriteLine("VecSize1 = " + CAN200_VecSize().ToString() + " Res = " + result.ToString() + " to = " + ((Int32)timeout).ToString());
+#endif
+            CAN200_Pop(ref ret);
+            for (j = 0; j < ret.DLC; j++)
+            {
+                msg.data[j] = (Byte)ret.DataByte[j];
+            }
+            msg.id = ret.sID;
+            msg.len = (Byte)ret.DLC;
+#if DDDE
+            Trace.WriteLine("VecSize2 = " + CAN200_VecSize().ToString());
+#endif
+#if DDDE
+            Trace.WriteLine("Recv byte count = " + j.ToString());
+            Trace.Write("Recv: ");
+            print_RX_TX(ret);
+#endif
+#if DDDE
+            Trace.WriteLine("VecSize3 = " + CAN200_VecSize().ToString());
+#endif
+            return true;
+        }
+        public Boolean RecvPack(ref Byte[] arr, ref int count, int timeout)
+        {
+            int result = 0;
+            int i = 0, j = 0;
+            RX_TX_Buffer msg = new RX_TX_Buffer(1);
+            do
+            {
+                result = CAN200_VecSize();
+                Thread.Sleep(1);
+            } while (result < count && timeout-- > 0);
+#if DDDE
+            Trace.WriteLine("res = " + result.ToString() + " to = " + timeout.ToString());
+#endif
+            if (timeout <= 0)
+            {
+                Trace.WriteLine("ELCAN RecvPack Error timeout");
+                return false;
+            }
+            for (i = 0; i < count; i++)
+            {
+                if (CAN200_VecSize() > 0)
+                    CAN200_Pop(ref msg);
+#if DDDE
+//                print_RX_TX(msg);
+#endif
+                for (j = 0; j < msg.DLC; j++)
+                {
+                    if ((i * 8 + j) < arr.Length)
+                        arr[i * 8 + j] = (Byte)msg.DataByte[j];
+                }
+                Application.DoEvents();
+                if (Progress != null)
+                    Progress(this, new MyEventArgs(i));
+                //                Application.DoEvents();
+            }
+#if DDDE
+            Trace.WriteLine("Recv pack count = " + i.ToString());
+            Trace.WriteLine("Recv byte count = " + ((i - 1) * 8 + msg.DLC).ToString());
+#endif
+            return true;
+        }
+        public Boolean SendCmd(ref canmsg_t msg, int timeout)
+        {
+            if (!Send(ref msg))
+                return false;
+            if (!Recv(ref msg, timeout))
+                return false;
+            return true;
+        }
+        public int GetStatus()
+        {
+            int result = 0;
+            CAN200_GetStatus(hCan, port, ref result);
+            return result;
+        }
+        ~ECAN18Converter()
+        {
+            if (Is_Open)
+                CAN200_Close(hCan);
+        }
+        public String ErrDecode(int err)
+        {
+            int e1, e2, e3;
+            e1 = err & 0x001F;
+            e2 = (err >> 5) & 0x0001;
+            e3 = (err >> 6) & 0x0003;
+            String sss = "";
+            switch (e1)
+            {
+                case 2:
+                    sss += "идентификатор: биты 28-21, ";
+                    break;
+                case 3:
+                    sss += "начало кадра, ";
+                    break;
+                case 4:
+                    sss += "бит SRTR, ";
+                    break;
+                case 5:
+                    sss += "бит IDE, ";
+                    break;
+                case 6:
+                    sss += "идентификатор: биты 20-18, ";
+                    break;
+                case 7:
+                    sss += "идентификатор: биты 17-13, ";
+                    break;
+                case 8:
+                    sss += "CRC последовательность, ";
+                    break;
+                case 9:
+                    sss += "зарезервированный бит 0, ";
+                    break;
+                case 10:
+                    sss += "поле данных, ";
+                    break;
+                case 11:
+                    sss += "код длины данных, ";
+                    break;
+                case 12:
+                    sss += "бит RTR, ";
+                    break;
+                case 13:
+                    sss += "зарезервированный бит 1, ";
+                    break;
+                case 14:
+                    sss += "идентификатор: биты 4-0, ";
+                    break;
+                case 15:
+                    sss += "идентификатор: биты 12-5, ";
+                    break;
+                case 17:
+                    sss += "флаг активной ошибки, ";
+                    break;
+                case 18:
+                    sss += "перерыв на шине, ";
+                    break;
+                case 19:
+                    sss += "tolerate dominant bits, ";
+                    break;
+                case 22:
+                    sss += "флаг пассивной ошибки, ";
+                    break;
+                case 23:
+                    sss += "разделитель ошибки, ";
+                    break;
+                case 24:
+                    sss += "разделитель CRC, ";
+                    break;
+                case 25:
+                    sss += "интервал подтверждения, ";
+                    break;
+                case 26:
+                    sss += "конец кадра, ";
+                    break;
+                case 27:
+                    sss += "разделитель подтверждения, ";
+                    break;
+                case 28:
+                    sss += "флаг переполнения, ";
+                    break;
+                default:
+                    sss += "ХЗ, что за ошибка, ";
+                    break;
+            }
+
+            if (e2 == 0)
+                sss += "TX (ошибка в течение выдачи), ";
+            else
+                sss += "RX (ошибка в течение приема), ";
+
+            switch (e3)
+            {
+                case 0:
+                    sss += "0 - битовая ошибка";
+                    break;
+                case 1:
+                    sss += "1 - ошибка формы";
+                    break;
+                case 2:
+                    sss += "2 - ошибка заполнения";
+                    break;
+                default:
+                    sss += "3 - другая ошибка";
+                    break;
+            }
+            return "Error " + err.ToString() + " " + sss;
+        }
+        void print_RX_TX(RX_TX_Buffer bb)
+        {
+            Trace.Write(" ID=" + bb.sID.ToString("X2") + " len=" + bb.DLC.ToString());
+            Trace.Write(" Data:");
+            for (int i = 0; i < bb.DLC; i++)
+                Trace.Write(" 0x" + bb.DataByte[i].ToString("X2"));
+            Trace.WriteLine("");
+        }
+        void print_RX_TX(canmsg_t mm)
+        {
+            Trace.Write(" ID=" + mm.id.ToString("X2") + " len=" + mm.len.ToString());
+            Trace.Write(" Data:");
+            for (int i = 0; i < mm.len; i++)
+                Trace.Write(" 0x" + mm.data[i].ToString("X2"));
+            Trace.WriteLine("");
+        }
+
+        /// <summary>
+        /// для отладки 
+        /// </summary>
+        /// <returns></returns>
+        public void GetRxErrorCounter()
+        {
+            int counter = 0;
+            CAN200_P_GetRxErrorCounter(hCan, port, ref counter);
+            Trace.WriteLine("GetRxErrorCounter = " + counter.ToString());
+        }
+        public void GetRxMessageCounter()
+        {
+            int counter = 0;
+            CAN200_P_GetRxMessageCounter(hCan, port, ref counter);
+            Trace.WriteLine("GetRxMessageCounter = " + counter.ToString());
+        }
+        public void GetEventData()
+        {
+            TEventData evd = new TEventData();
+            CAN200_GetEventData(hCan, port, ref evd);
+            Trace.Write("IntrID = " + evd.IntrID.ToString() + " ");
+            print_RX_TX(evd.rxtxbuf);
+        }
+        int VecSize()
+        {
+            return CAN200_VecSize();
+        }
+        public int VectorSize()
+        {
+            return CAN200_VecSize();
+        }
+        int Pop()
+        {
+            RX_TX_Buffer buf = new RX_TX_Buffer(1);
+            CAN200_Pop(ref buf);
+            Trace.WriteLine("Pop ");
+            print_RX_TX(buf);
+            return 0;
+        }
+        public void Recv_Enable()
+        {
+            CAN200_Recv_Enable(hCan, port, 2000);
+            Trace.WriteLine("Elcus Recv Enable");
+        }
+        public void Recv_Disable()
+        {
+            CAN200_Recv_Disable();
+            Trace.WriteLine("Elcus Recv disable");
+        }
+        public void Clear_RX()
+        {
+            Trace.WriteLine("Cleared: " + CAN200_ClearBuf(hCan, port).ToString());
+        }
+        public void HWReset()
+        {
+            CAN200_HardReset(hCan, 0);
+            //            Trace.WriteLine("Hardware reset");
+        }
+
+    }
+    #endregion
+
+
     #region MCANConverter
     public class MCANConverter : IUCANConverter
     {
