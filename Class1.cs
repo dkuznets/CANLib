@@ -3803,7 +3803,7 @@ using HANDLE = System.IntPtr;
             do
             {
                 cnt = vecsize();
-                Thread.Sleep(1);
+//                Thread.Sleep(1);
             } while (cnt < count && timeout-- > 0);
 #if DDDM
             Trace.WriteLine("MCAN packets: " + cnt.ToString());
