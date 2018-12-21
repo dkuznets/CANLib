@@ -3851,9 +3851,11 @@ using HANDLE = System.IntPtr;
             Trace.WriteLine("Marathon Recv enable");
             if (vecsize() > 0)
             {
-                mtx.WaitOne();
+                Monitor.Enter(mbuf);
+//                mtx.WaitOne();
                 mbuf.Clear();
-                mtx.ReleaseMutex();
+//            mtx.ReleaseMutex();
+                Monitor.Exit(mbuf);
             }
             flag_thr = true;
             thr = new Thread(t_recv);
@@ -3866,9 +3868,11 @@ using HANDLE = System.IntPtr;
             Trace.WriteLine("Marathon Recv disable");
             if (vecsize() > 0)
             {
-                mtx.WaitOne();
+                Monitor.Enter(mbuf);
+//                mtx.WaitOne();
                 mbuf.Clear();
-                mtx.ReleaseMutex();
+//            mtx.ReleaseMutex();
+                Monitor.Exit(mbuf);
             }
             flag_thr = false;
             if (thr != null)
@@ -4061,37 +4065,46 @@ using HANDLE = System.IntPtr;
         }
         public int VectorSize()
         {
-            mtx.WaitOne();
+            Monitor.Enter(mbuf);
+//            mtx.WaitOne();
             int ii = mbuf.Count;
-            mtx.ReleaseMutex();
+//            mtx.ReleaseMutex();
+            Monitor.Exit(mbuf);
             return ii;
         }
         int vecsize()
         {
-            mtx.WaitOne();
+            Monitor.Enter(mbuf);
+//            mtx.WaitOne();
             int ii = mbuf.Count;
-            mtx.ReleaseMutex();
+//            mtx.ReleaseMutex();
+            Monitor.Exit(mbuf);
             return ii;
         }
         void push_back(canmsg_t msg)
         {
-            mtx.WaitOne();
+            Monitor.Enter(mbuf);
+//            mtx.WaitOne();
             mbuf.Add(msg);
-            mtx.ReleaseMutex();
+//            mtx.ReleaseMutex();
+            Monitor.Exit(mbuf);
         }
         Boolean pop(ref canmsg_t msg)
         {
-            mtx.WaitOne();
+            Monitor.Enter(mbuf);
+            //            mtx.WaitOne();
             if (mbuf.Count >= 1)
             {
                 msg = mbuf[0];
                 mbuf.RemoveAt(0);
-                mtx.ReleaseMutex();
+//            mtx.ReleaseMutex();
+                Monitor.Exit(mbuf);
                 return true;
             }
             else
             {
-                mtx.ReleaseMutex();
+//            mtx.ReleaseMutex();
+                Monitor.Exit(mbuf);
                 return false;
             }
         }
