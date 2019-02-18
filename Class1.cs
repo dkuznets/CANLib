@@ -4065,46 +4065,46 @@ using HANDLE = System.IntPtr;
         }
         public int VectorSize()
         {
-            Monitor.Enter(mbuf);
-//            mtx.WaitOne();
+//            Monitor.Enter(mbuf);
+            mtx.WaitOne();
             int ii = mbuf.Count;
-//            mtx.ReleaseMutex();
-            Monitor.Exit(mbuf);
+            mtx.ReleaseMutex();
+//            Monitor.Exit(mbuf);
             return ii;
         }
         int vecsize()
         {
-            Monitor.Enter(mbuf);
-//            mtx.WaitOne();
+//            Monitor.Enter(mbuf);
+            mtx.WaitOne();
             int ii = mbuf.Count;
-//            mtx.ReleaseMutex();
-            Monitor.Exit(mbuf);
+            mtx.ReleaseMutex();
+//            Monitor.Exit(mbuf);
             return ii;
         }
         void push_back(canmsg_t msg)
         {
-            Monitor.Enter(mbuf);
-//            mtx.WaitOne();
+//            Monitor.Enter(mbuf);
+            mtx.WaitOne();
             mbuf.Add(msg);
-//            mtx.ReleaseMutex();
-            Monitor.Exit(mbuf);
+            mtx.ReleaseMutex();
+//            Monitor.Exit(mbuf);
         }
         Boolean pop(ref canmsg_t msg)
         {
-            Monitor.Enter(mbuf);
-            //            mtx.WaitOne();
+//            Monitor.Enter(mbuf);
+            mtx.WaitOne();
             if (mbuf.Count >= 1)
             {
                 msg = mbuf[0];
                 mbuf.RemoveAt(0);
-//            mtx.ReleaseMutex();
-                Monitor.Exit(mbuf);
+                mtx.ReleaseMutex();
+//                Monitor.Exit(mbuf);
                 return true;
             }
             else
             {
-//            mtx.ReleaseMutex();
-                Monitor.Exit(mbuf);
+            mtx.ReleaseMutex();
+//                Monitor.Exit(mbuf);
                 return false;
             }
         }
