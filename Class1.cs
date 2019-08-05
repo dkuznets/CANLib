@@ -4420,6 +4420,7 @@ using HANDLE = System.IntPtr;
                         gch.Free();
                         Trace.Write("FCAN Recv packet");
                         push_back(rrr);
+                        reader.Write(0, 0);
                         continue;
                     }
                 }
