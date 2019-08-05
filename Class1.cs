@@ -9,6 +9,9 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Windows.Forms;
 using System.IO;
+using System.Data;
+using System.IO.MemoryMappedFiles;
+
 
 using HANDLE = System.IntPtr;
 
@@ -4124,6 +4127,8 @@ using HANDLE = System.IntPtr;
         public canerrs_t errs = new canerrs_t();
         public canwait_t cw = new canwait_t();
         public canmsg_t frame = new canmsg_t();
+        MemoryMappedFile sharedMemory = null;
+        Int32 framesize = 0;
         Boolean flag_thr = true;
         List<canmsg_t> mbuf = new List<canmsg_t>();
         Thread thr;
@@ -4177,7 +4182,7 @@ using HANDLE = System.IntPtr;
             get
             {
 //                UInt64 ver = //#define VER 0x0000290120261746
-                UInt64 ver = 0x0000011220162136;
+                UInt64 ver = 0x0000020820190845;
                 int a1 = (int)(ver >> 40);
                 int a2 = (int)(ver >> 32) & 0xFF;
                 int a3 = (int)(ver >> 16) & 0xFFFF;
@@ -4190,8 +4195,10 @@ using HANDLE = System.IntPtr;
         }
         public Boolean Open()
         {
+            sharedMemory = MemoryMappedFile.CreateOrOpen("MF0", Marshal.SizeOf(frame));
             Info = "Fake CAN driver";
             Is_Open = true;
+            framesize = Marshal.SizeOf(frame);
             return true;
         }
         public void Close()
@@ -4201,15 +4208,86 @@ using HANDLE = System.IntPtr;
                     thr.Abort();
             thr = null;
             Is_Open = false;
+            sharedMemory.Dispose();
         }
         public Boolean Send(ref canmsg_t msg)
         {
-            canerrs_t ce = new canerrs_t();
+            Int32 size_get = 1;
+            UInt32 ttt = 1;
+            while (size_get > 0 & ttt-- > 0)
+            {
+                using (MemoryMappedViewAccessor reader = sharedMemory.CreateViewAccessor(0, 4, MemoryMappedFileAccess.Read))
+                {
+                    size_get = reader.ReadInt32(0);
+                }
+                Thread.Sleep(1);
+            }
+            if (ttt == 0)
+            {
+                Trace.WriteLine("FCAN send Error timeout");
+                ErrEvent(this, new MyEventArgs("Не удалось отправить сообщение"));
+                return false;
+            }
+
+            using (MemoryMappedViewAccessor writer = sharedMemory.CreateViewAccessor(0, framesize + 4))
+            {
+                writer.Write(0, framesize);
+                byte[] arr = new byte[framesize];
+                GCHandle gch = GCHandle.Alloc(arr, GCHandleType.Pinned);
+                IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(arr, 0);
+                try
+                {
+                    Marshal.StructureToPtr(msg, ptr, true);
+                }
+                finally
+                {
+                    if (gch.IsAllocated)
+                    {
+                        gch.Free();
+                    }
+                }
+                writer.WriteArray<Byte>(4, arr, 0, framesize);
+            }
             return true;
         }
         public Boolean Send(ref canmsg_t msg, int timeout)
         {
-            canerrs_t ce = new canerrs_t();
+            Int32 size_get = 1;
+            UInt32 ttt = (UInt32)timeout;
+            while (size_get > 0 & ttt-- > 0)
+            {
+                using (MemoryMappedViewAccessor reader = sharedMemory.CreateViewAccessor(0, 4, MemoryMappedFileAccess.Read))
+                {
+                    size_get = reader.ReadInt32(0);
+                }
+                Thread.Sleep(1);
+            }
+            if (ttt == 0)
+            {
+                Trace.WriteLine("FCAN send Error timeout");
+                ErrEvent(this, new MyEventArgs("Не удалось отправить сообщение"));
+                return false;
+            }
+
+            using (MemoryMappedViewAccessor writer = sharedMemory.CreateViewAccessor(0, framesize + 4))
+            {
+                writer.Write(0, framesize);
+                byte[] arr = new byte[framesize];
+                GCHandle gch = GCHandle.Alloc(arr, GCHandleType.Pinned); 
+                IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(arr, 0);
+                try
+                {
+                    Marshal.StructureToPtr(msg, ptr, true);
+                }
+                finally
+                {
+                    if (gch.IsAllocated)
+                    {
+                        gch.Free();
+                    }
+                }
+                writer.WriteArray<Byte>(4, arr, 0, framesize);
+            }
             return true;
         }
         public Boolean Recv(ref canmsg_t msg, int timeout)
@@ -4245,7 +4323,7 @@ using HANDLE = System.IntPtr;
 #endif
             if (timeout <= 0)
             {
-                Trace.WriteLine("MCAN RecvPack Error timeout");
+                Trace.WriteLine("FCAN RecvPack Error timeout");
                 //                return false;
             }
             for (int i = 0; i < count; i++)
@@ -4286,22 +4364,66 @@ using HANDLE = System.IntPtr;
             Trace.WriteLine("FakeCAN Recv enable");
             if (vecsize() > 0)
             {
-                mtx.WaitOne();
+                Monitor.Enter(mbuf);
                 mbuf.Clear();
-                mtx.ReleaseMutex();
+                Monitor.Exit(mbuf);
             }
-//            MarCAN_Recv_Enable();
+            flag_thr = true;
+            thr = new Thread(t_recv);
+            thr.Start();
         }
         public void Recv_Disable()
         {
-            Trace.WriteLine("Marathon Recv disable");
+            Trace.WriteLine("FakeCAN Recv disable");
             if (vecsize() > 0)
             {
-                mtx.WaitOne();
+                Monitor.Enter(mbuf);
                 mbuf.Clear();
-                mtx.ReleaseMutex();
+                Monitor.Exit(mbuf);
             }
-//            MarCAN_Recv_Disable();
+            flag_thr = false;
+            if (thr != null)
+                if (thr.IsAlive)
+                {
+                    thr.Join();
+                    thr.Abort();
+                }
+            thr = null;
+        }
+        public void t_recv()
+        {
+            canmsg_t mess = new canmsg_t();
+            mess.data = new Byte[8];
+            Int16 ret = 0;
+            Int32 size_get = 0;
+            UInt32 ttt = 1;
+            while (flag_thr)
+            {
+                using (MemoryMappedViewAccessor reader = sharedMemory.CreateViewAccessor(0, 4, MemoryMappedFileAccess.Read))
+                {
+                    size_get = reader.ReadInt32(0);
+                }
+                if (size_get == 0)
+                {
+                    Thread.Sleep(1);
+                    continue;
+                }
+                else
+                {
+                    using (MemoryMappedViewAccessor reader = sharedMemory.CreateViewAccessor(4, framesize, MemoryMappedFileAccess.ReadWrite))
+                    {
+                        Byte[] arr = new Byte[framesize];
+                        reader.ReadArray<Byte>(0, arr, 0, framesize);
+                        GCHandle gch = GCHandle.Alloc(arr, GCHandleType.Pinned);
+                        IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(arr, 0);
+                        canmsg_t rrr = (canmsg_t)Marshal.PtrToStructure(ptr, typeof(canmsg_t));
+                        gch.Free();
+                        Trace.Write("FCAN Recv packet");
+                        push_back(rrr);
+                        continue;
+                    }
+                }
+            }
         }
         ~FCANConverter()
         {
